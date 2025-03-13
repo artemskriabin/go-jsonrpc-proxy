@@ -106,7 +106,7 @@ func HandleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 	requestPayload, err := parseRequestBody(req)
 	if err != nil {
 		rpcErr := &jsonrpc.Errors{}
-		rpcErr.ParseError(err)
+		rpcErr.ParseError(err.Error())
 		internalErrorBytes, _ := json.Marshal(rpcErr)
 		res.Write(internalErrorBytes)
 		return
