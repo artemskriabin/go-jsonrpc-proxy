@@ -5,7 +5,7 @@ RUN apk add git build-base ca-certificates
 WORKDIR /go/src/github.com/artemskriabin/go-jsonrpc-proxy
 COPY . .
 
-RUN CGO_ENABLED=1 GO111MODULE=on GOOS=linux go build  -o /usr/local/bin/go-jsonrpc-proxy /go/src/github.com/artemskriabin/go-jsonrpc-proxy
+RUN CGO_ENABLED=1 GO111MODULE=on GOOS=linux go build  -o /usr/local/bin/go-jsonrpc-proxy /go/src/github.com/artemskriabin/go-jsonrpc-proxy/cmd/main.go
 
 FROM scratch
 COPY --from=alpine:3.9 /bin/sh /bin/sh
