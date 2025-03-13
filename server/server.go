@@ -57,7 +57,13 @@ func serveReverseProxy(target string, res http.ResponseWriter, req *http.Request
 	url, _ := url.Parse(target)
 
 	// create the reverse proxy
-	proxy := httputil.NewSingleHostReverseProxy(url)
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(url)
+			r.Out.Host = url.Host // if desired
+			r.Out.URL.Path = url.Path
+		},
+	}
 
 	// Update the headers to allow for SSL redirection
 	req.URL.Host = url.Host
