@@ -2,9 +2,10 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/artemskriabin/go-jsonrpc-proxy/config"
 	"github.com/patrickmn/go-cache"
-	"github.com/teambition/jsonrpc-go"
+	"github.com/sb-im/jsonrpc-lite"
 	"gopkg.in/square/go-jose.v2/json"
 	"io/ioutil"
 	"log"
@@ -88,24 +89,36 @@ func requestBody(request *http.Request) *bytes.Buffer {
 	return bytes.NewBuffer(body)
 }
 
-func parseRequestBody(request *http.Request) *jsonrpc.RPC {
+func parseRequestBody(request *http.Request) (*jsonrpc.Jsonrpc, error) {
 	buffered := requestBody(request)
-	req, _ := jsonrpc.Parse(buffered.Bytes())
+	req, err := jsonrpc.Parse(buffered.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse body, %w", err)
+	}
 	if req == nil {
 		log.Printf("could not parse the JSON-RPC")
 	}
-	return req
+	return req, nil
 }
 
 // HandleRequestAndRedirect given a request send it to the appropriate url
 func HandleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
-	requestPayload := parseRequestBody(req)
+	requestPayload, err := parseRequestBody(req)
+	if err != nil {
+		rpcErr := &jsonrpc.Errors{}
+		rpcErr.ParseError(err)
+		internalErrorBytes, _ := json.Marshal(rpcErr)
+		res.Write(internalErrorBytes)
+		return
+	}
+
 	url, errRedir := getRedirectTo(requestPayload)
 
 	if errRedir != nil {
 		errObjBytes, errJSONMarshal := json.Marshal(errRedir)
 		if errJSONMarshal != nil {
-			internalError := jsonrpc.InternalError()
+			internalError := &jsonrpc.Errors{}
+			internalError.InternalError(errJSONMarshal)
 			internalErrorBytes, _ := json.Marshal(internalError)
 			res.Write(internalErrorBytes)
 			return
@@ -124,9 +137,11 @@ func (h *HandlerWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	HandleRequestAndRedirect(w, r)
 }
 
-func getRedirectTo(req *jsonrpc.RPC) (*string, *jsonrpc.ErrorObj) {
+func getRedirectTo(req *jsonrpc.Jsonrpc) (*string, *jsonrpc.Errors) {
 	if methodNameCache == nil {
-		return nil, jsonrpc.InternalError("cache not loaded")
+		err := jsonrpc.Errors{}
+		err.InternalError("cache not loaded")
+		return nil, &err
 	}
 	if value, ok := methodNameCache.Get(req.Method); ok {
 		methodRegEx := value.(MethodRegExp)
@@ -140,7 +155,10 @@ func getRedirectTo(req *jsonrpc.RPC) (*string, *jsonrpc.ErrorObj) {
 			return &randomRedirectTo, nil
 		}
 	}
-	return nil, jsonrpc.MethodNotFound()
+
+	err := jsonrpc.Errors{}
+	err.MethodNotFound(req.Method)
+	return nil, &err
 }
 
 func getRandomElem(array []string) string {
