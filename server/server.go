@@ -91,10 +91,12 @@ func requestBody(request *http.Request) *bytes.Buffer {
 
 func parseRequestBody(request *http.Request) (*jsonrpc.Jsonrpc, error) {
 	buffered := requestBody(request)
+	fmt.Println(buffered.String())
 	req, err := jsonrpc.Parse(buffered.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse body, %w", err)
 	}
+
 	if req == nil {
 		log.Printf("could not parse the JSON-RPC")
 	}
