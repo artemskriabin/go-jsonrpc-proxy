@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/artemskriabin/go-jsonrpc-proxy/config"
 	"github.com/patrickmn/go-cache"
 	"github.com/sb-im/jsonrpc-lite"
@@ -90,7 +91,7 @@ func requestBody(request *http.Request) *bytes.Buffer {
 
 func parseRequestBody(request *http.Request) []*jsonrpc.Jsonrpc {
 	buffered := requestBody(request)
-
+	fmt.Println(buffered.String())
 	req := jsonrpc.Batch(buffered.Bytes())
 	if req == nil {
 		log.Printf("could not parse the JSON-RPC")
