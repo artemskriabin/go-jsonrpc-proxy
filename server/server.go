@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/artemskriabin/go-jsonrpc-proxy/config"
 	"github.com/patrickmn/go-cache"
 	"github.com/sb-im/jsonrpc-lite"
@@ -89,26 +88,23 @@ func requestBody(request *http.Request) *bytes.Buffer {
 	return bytes.NewBuffer(body)
 }
 
-func parseRequestBody(request *http.Request) (*jsonrpc.Jsonrpc, error) {
+func parseRequestBody(request *http.Request) []*jsonrpc.Jsonrpc {
 	buffered := requestBody(request)
-	fmt.Println(buffered.String())
-	req, err := jsonrpc.Parse(buffered.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse body, %w", err)
-	}
 
+	req := jsonrpc.Batch(buffered.Bytes())
 	if req == nil {
 		log.Printf("could not parse the JSON-RPC")
 	}
-	return req, nil
+
+	return req
 }
 
 // HandleRequestAndRedirect given a request send it to the appropriate url
 func HandleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
-	requestPayload, err := parseRequestBody(req)
-	if err != nil {
+	requestPayload := parseRequestBody(req)
+	if requestPayload == nil {
 		rpcErr := &jsonrpc.Errors{}
-		rpcErr.ParseError(err.Error())
+		rpcErr.ParseError(nil)
 		internalErrorBytes, _ := json.Marshal(rpcErr)
 		res.Write(internalErrorBytes)
 		return
@@ -139,27 +135,32 @@ func (h *HandlerWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	HandleRequestAndRedirect(w, r)
 }
 
-func getRedirectTo(req *jsonrpc.Jsonrpc) (*string, *jsonrpc.Errors) {
+func getRedirectTo(req []*jsonrpc.Jsonrpc) (*string, *jsonrpc.Errors) {
 	if methodNameCache == nil {
 		err := jsonrpc.Errors{}
 		err.InternalError("cache not loaded")
 		return nil, &err
 	}
-	if value, ok := methodNameCache.Get(req.Method); ok {
-		methodRegEx := value.(MethodRegExp)
-		randomRedirectTo := getRandomElem(methodRegEx.ProxyTo)
-		return &randomRedirectTo, nil
-	}
-	for _, method := range methodPriorityListOrder {
-		if method.NameRegexp.MatchString(req.Method) {
-			methodNameCache.SetDefault(req.Method, method)
-			randomRedirectTo := getRandomElem(method.ProxyTo)
+	for _, r := range req {
+		if value, ok := methodNameCache.Get(r.Method); ok {
+			methodRegEx := value.(MethodRegExp)
+			randomRedirectTo := getRandomElem(methodRegEx.ProxyTo)
 			return &randomRedirectTo, nil
 		}
 	}
 
+	for _, r := range req {
+		for _, method := range methodPriorityListOrder {
+			if method.NameRegexp.MatchString(r.Method) {
+				methodNameCache.SetDefault(r.Method, method)
+				randomRedirectTo := getRandomElem(method.ProxyTo)
+				return &randomRedirectTo, nil
+			}
+		}
+	}
+
 	err := jsonrpc.Errors{}
-	err.MethodNotFound(req.Method)
+	err.MethodNotFound(nil)
 	return nil, &err
 }
 
