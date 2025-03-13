@@ -2,7 +2,7 @@ package server
 
 import (
 	"bytes"
-	"github.com/AxLabs/go-jsonrpc-proxy/config"
+	"github.com/artemskriabin/go-jsonrpc-proxy/config"
 	"github.com/patrickmn/go-cache"
 	"github.com/teambition/jsonrpc-go"
 	"gopkg.in/square/go-jose.v2/json"
